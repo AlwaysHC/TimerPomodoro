@@ -1,99 +1,141 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Threading;
 using System.Windows.Forms;
 using TimerPomodoro.Properties;
 
 namespace TimerPomodoro {
     public partial class TP_Main: Form {
+        private static readonly TimeSpan SessionDuration = TimeSpan.FromMinutes(25);
+        private readonly Stopwatch _sessionClock = new();
+        private readonly Stopwatch _breakClock = new();
+        private readonly System.Windows.Forms.Timer _flashTimer;
+        private PomodoroState _state;
+        private bool _needsSave;
+        private TimeSpan _breakElapsed;
+        private DateTime _sessionStartedAt;
+        private int _flashStep;
+
         public TP_Main() {
+            (_state, _needsSave) = PomodoroStore.Load();
             InitializeComponent();
             Icon = Resources.Pomodoro;
-
-            StreamReader SR = null;
-            try {
-                SR = new StreamReader("TimerPomodoro.txt");
-                _PomodoriStart = Int32.Parse(SR.ReadLine());
-                _PomodoriToday = Int32.Parse(SR.ReadLine());
-                _PomodoriYesterday = Int32.Parse(SR.ReadLine());
-                _PomodoriDate = DateTime.Parse(SR.ReadLine());
-            }
-            catch {
-            }
-            finally {
-                if (SR != null) {
-                    SR.Close();
-                }
-            }
-            if (_PomodoriDate.Date != DateTime.Now.Date) {
-                _PomodoriYesterday = _PomodoriToday;
-                _PomodoriToday = 0;
-            }
-
-            btnStop_Click(null, null);
+            _flashTimer = new(components) { Interval = 500 };
+            _flashTimer.Tick += FlashTimer_Tick;
+            AdvanceDate();
+            ResetSession();
         }
 
-        private DateTime _DateTimeStop = DateTime.MinValue;
-        private TimeSpan _TimeSpanStop = new TimeSpan(0, 0, 0);
-        private DateTime _TimeSpanLastStop = DateTime.MinValue;
-        private int _PomodoriStart = 0;
-        private int _PomodoriToday = 0;
-        private int _PomodoriYesterday = 0;
-        private DateTime _PomodoriDate = DateTime.MinValue;
+        protected override void OnShown(EventArgs e) {
+            base.OnShown(e);
+            using Graphics graphics = lblTimer.CreateGraphics();
+            SizeF size = graphics.MeasureString(" 25:00.0 ", lblTimer.Font);
+            Font timerFont = new(lblTimer.Font.FontFamily, lblTimer.Font.Size * lblTimer.Width / size.Width, lblTimer.Font.Style);
+            lblTimer.Font = timerFont;
+            lblTimer.Disposed += (_, _) => timerFont.Dispose();
+            if (_needsSave) {
+                Save();
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e) {
+            base.OnFormClosing(e);
+            if (!e.Cancel && _needsSave && !Save()) {
+                e.Cancel = true;
+            }
+        }
+
+        private bool AdvanceDate() {
+            PomodoroState updated = _state.AdvanceTo(DateOnly.FromDateTime(DateTime.Today));
+            if (updated == _state) {
+                return false;
+            }
+
+            _state = updated;
+            _needsSave = true;
+            return true;
+        }
+
+        private void ShowStatus(string time) =>
+            lblAvvio.Text = $"{time} - {_state.Today} ({_state.Yesterday}) {_state.Total}";
+
+        private void ResetSession() {
+            StopFlash();
+            TimerEnd.Stop();
+            _sessionClock.Reset();
+            _breakElapsed = TimeSpan.Zero;
+            _breakClock.Restart();
+            TimerStop.Start();
+            lblTimer.Text = SessionDuration.ToString(@"mm\:ss\.f");
+            ShowStatus(_breakElapsed.ToString(@"hh\:mm\:ss"));
+        }
 
         private void btnStop_Click(object sender, EventArgs e) {
-            Graphics G = lblTimer.CreateGraphics();
-            SizeF S = G.MeasureString(" 25:00.0 ", lblTimer.Font);
-            lblTimer.Font = new Font(lblTimer.Font.FontFamily, lblTimer.Font.Size * (lblTimer.Width / S.Width), lblTimer.Font.Style);
-
-            TimerEnd.Enabled = false;
-            TimerStop.Enabled = true;
-            _DateTimeStop = DateTime.MinValue;
-            _TimeSpanStop = new TimeSpan(0, 0, 0);
-            _TimeSpanLastStop = DateTime.Now;
-            lblTimer.Text = new TimeSpan(0, 25, 0).ToString("mm\\:ss\\.f");
+            AdvanceDate();
+            ResetSession();
+            if (_needsSave) {
+                Save();
+            }
         }
 
         private void btnStart_Click(object sender, EventArgs e) {
-            _DateTimeStop = DateTime.Now.AddMinutes(25);
-            TimerEnd.Enabled = true;
-            TimerStop.Enabled = false;
-            lblAvvio.Text = DateTime.Now.ToString("HH\\:mm\\:ss") + " - " + _PomodoriToday + " (" + _PomodoriYesterday + ") " + _PomodoriStart;
+            AdvanceDate();
+            StopFlash();
+            _sessionStartedAt = DateTime.Now;
+            _sessionClock.Restart();
+            _breakClock.Reset();
+            TimerStop.Stop();
+            TimerEnd.Start();
+            lblTimer.Text = SessionDuration.ToString(@"mm\:ss\.f");
+            ShowStatus(_sessionStartedAt.ToString("HH:mm:ss"));
+            if (_needsSave) {
+                Save();
+            }
         }
 
         private void TimerEnd_Tick(object sender, EventArgs e) {
-            DateTime Ora = DateTime.Now;
-            if (Ora >= _DateTimeStop) {
-                Rectangle R = Screen.GetWorkingArea(lblTimer);
-                Left = (R.Width - Width) / 2;
-                Top = (R.Height - Height) / 2;
-
-                _PomodoriToday++;
-                _PomodoriStart++;
-                Save();
-                btnStop_Click(null, null);
-
-                BackColor = Color.Yellow;
-                Application.DoEvents();
-                Thread.Sleep(500);
-                BackColor = Color.Blue;
-                Application.DoEvents();
-                Thread.Sleep(500);
-                BackColor = Color.Red;
-                Application.DoEvents();
-                Thread.Sleep(500);
-                BackColor = SystemColors.Control;
-                Application.DoEvents();
+            if (!TimerEnd.Enabled) {
+                return;
             }
-            else {
-                lblTimer.Text = (_DateTimeStop.Subtract(Ora)).ToString("mm\\:ss\\.f");
+
+            bool dateChanged = AdvanceDate();
+            TimeSpan remaining = SessionDuration - _sessionClock.Elapsed;
+            if (remaining > TimeSpan.Zero) {
+                lblTimer.Text = remaining.ToString(@"mm\:ss\.f");
+                ShowStatus(_sessionStartedAt.ToString("HH:mm:ss"));
+                if (dateChanged) {
+                    Save();
+                }
+                return;
             }
+
+            _state = _state with { Total = _state.Total + 1, Today = _state.Today + 1 };
+            _needsSave = true;
+            ResetSession();
+            Rectangle area = Screen.GetWorkingArea(this);
+            Location = new(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
+            Save();
+            BackColor = Color.Yellow;
+            _flashTimer.Start();
         }
 
-        private void lblTimer_MouseMove(object sender, MouseEventArgs e) {
-            MoveWindow();
+        private void StopFlash() {
+            _flashTimer.Stop();
+            _flashStep = 0;
+            BackColor = SystemColors.Control;
         }
+
+        private void FlashTimer_Tick(object sender, EventArgs e) {
+            _flashStep++;
+            if (_flashStep >= 3) {
+                StopFlash();
+                return;
+            }
+            BackColor = _flashStep == 1 ? Color.Blue : Color.Red;
+        }
+
+        private void lblTimer_MouseMove(object sender, MouseEventArgs e) => MoveWindow();
 
         private void MoveWindow() {
             Point Pos = PointToClient(MousePosition);
@@ -161,33 +203,40 @@ namespace TimerPomodoro {
         }
 
         private void TimerStop_Tick(object sender, EventArgs e) {
-            DateTime Now = DateTime.Now;
-            if ((Now - _TimeSpanLastStop).TotalMilliseconds < TimerStop.Interval * 5) {
-                _TimeSpanStop = _TimeSpanStop.Add(Now - _TimeSpanLastStop);
+            if (!TimerStop.Enabled) {
+                return;
             }
-            if (_TimeSpanLastStop.DayOfYear != Now.DayOfYear) {
-                _PomodoriYesterday = _PomodoriToday;
-                _PomodoriToday = 0;
+
+            TimeSpan elapsed = _breakClock.Elapsed;
+            _breakClock.Restart();
+            if (elapsed.TotalMilliseconds < TimerStop.Interval * 5) {
+                _breakElapsed += elapsed;
+            }
+            bool dateChanged = AdvanceDate();
+            ShowStatus(_breakElapsed.ToString(@"hh\:mm\:ss"));
+            if (dateChanged) {
                 Save();
             }
-            _TimeSpanLastStop = Now;
-            lblAvvio.Text = _TimeSpanStop.ToString("hh\\:mm\\:ss") + " - " + _PomodoriToday + " (" + _PomodoriYesterday + ") " + _PomodoriStart;
         }
 
-        private void lblStart_MouseMove(object sender, MouseEventArgs e) {
-            MoveWindow();
-        }
+        private void lblStart_MouseMove(object sender, MouseEventArgs e) => MoveWindow();
 
-        private void Save() {
+        private bool Save() {
             try {
-                StreamWriter SW = new StreamWriter("TimerPomodoro.txt", false);
-                SW.WriteLine(_PomodoriStart);
-                SW.WriteLine(_PomodoriToday);
-                SW.WriteLine(_PomodoriYesterday);
-                SW.WriteLine(DateTime.Now);
-                SW.Close();
+                PomodoroStore.Save(_state);
+                _needsSave = false;
+                return true;
             }
-            catch {
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) {
+                bool sessionRunning = TimerEnd.Enabled;
+                bool breakRunning = TimerStop.Enabled;
+                TimerEnd.Stop();
+                TimerStop.Stop();
+                MessageBox.Show(this, $"Could not save your counters to '{PomodoroStore.FilePath}'.\n\n{exception.Message}",
+                    "Timer Pomodoro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                TimerEnd.Enabled = sessionRunning;
+                TimerStop.Enabled = breakRunning;
+                return false;
             }
         }
     }

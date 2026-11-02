@@ -1,7 +1,7 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual C# Express 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TimerPomodoro", "TimerPomodoro.csproj", "{37A5561B-F7A1-4693-A7F6-79D8BBD951C3}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TimerPomodoro", "TimerPomodoro.csproj", "{37A5561B-F7A1-4693-A7F6-79D8BBD951C3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
