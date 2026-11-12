@@ -11,11 +11,11 @@ namespace TimerPomodoro {
         static void Main() {
             ApplicationConfiguration.Initialize();
             try {
-                using TP_Main window = new();
-                Application.Run(window);
+                using TP_Main Window = new();
+                Application.Run(Window);
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException) {
-                MessageBox.Show($"Could not load your counters.\n\n{exception.Message}", "Timer Pomodoro",
+            catch (Exception Ex) when (Ex is IOException or UnauthorizedAccessException or FormatException) {
+                MessageBox.Show($"Could not load your counters.\n\n{Ex.Message}", "Timer Pomodoro",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

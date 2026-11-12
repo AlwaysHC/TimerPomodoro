@@ -7,74 +7,74 @@ using TimerPomodoro.Properties;
 
 namespace TimerPomodoro {
     public partial class TP_Main: Form {
-        private static readonly TimeSpan SessionDuration = TimeSpan.FromMinutes(25);
-        private readonly Stopwatch _sessionClock = new();
-        private readonly Stopwatch _breakClock = new();
-        private readonly System.Windows.Forms.Timer _flashTimer;
-        private PomodoroState _state;
-        private bool _needsSave;
-        private TimeSpan _breakElapsed;
-        private DateTime _sessionStartedAt;
-        private int _flashStep;
+        private static readonly TimeSpan SESSIONDURATION = TimeSpan.FromMinutes(25);
+        private readonly Stopwatch _SessionClock = new();
+        private readonly Stopwatch _BreakClock = new();
+        private readonly System.Windows.Forms.Timer _FlashTimer;
+        private PomodoroState _State;
+        private bool _NeedsSave;
+        private TimeSpan _BreakElapsed;
+        private DateTime _SessionStartedAt;
+        private int _FlashStep;
 
         public TP_Main() {
-            (_state, _needsSave) = PomodoroStore.Load();
+            (_State, _NeedsSave) = PomodoroStore.Load();
             InitializeComponent();
             Icon = Resources.Pomodoro;
-            _flashTimer = new(components) { Interval = 500 };
-            _flashTimer.Tick += FlashTimer_Tick;
+            _FlashTimer = new(components) { Interval = 500 };
+            _FlashTimer.Tick += FlashTimer_Tick;
             AdvanceDate();
             ResetSession();
         }
 
         protected override void OnShown(EventArgs e) {
             base.OnShown(e);
-            using Graphics graphics = lblTimer.CreateGraphics();
-            SizeF size = graphics.MeasureString(" 25:00.0 ", lblTimer.Font);
-            Font timerFont = new(lblTimer.Font.FontFamily, lblTimer.Font.Size * lblTimer.Width / size.Width, lblTimer.Font.Style);
-            lblTimer.Font = timerFont;
-            lblTimer.Disposed += (_, _) => timerFont.Dispose();
-            if (_needsSave) {
+            using Graphics Graphics = lblTimer.CreateGraphics();
+            SizeF Size = Graphics.MeasureString(" 25:00.0 ", lblTimer.Font);
+            Font TimerFont = new(lblTimer.Font.FontFamily, lblTimer.Font.Size * lblTimer.Width / Size.Width, lblTimer.Font.Style);
+            lblTimer.Font = TimerFont;
+            lblTimer.Disposed += (_, _) => TimerFont.Dispose();
+            if (_NeedsSave) {
                 Save();
             }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e) {
             base.OnFormClosing(e);
-            if (!e.Cancel && _needsSave && !Save()) {
+            if (!e.Cancel && _NeedsSave && !Save()) {
                 e.Cancel = true;
             }
         }
 
         private bool AdvanceDate() {
-            PomodoroState updated = _state.AdvanceTo(DateOnly.FromDateTime(DateTime.Today));
-            if (updated == _state) {
+            PomodoroState Updated = _State.AdvanceTo(DateOnly.FromDateTime(DateTime.Today));
+            if (Updated == _State) {
                 return false;
             }
 
-            _state = updated;
-            _needsSave = true;
+            _State = Updated;
+            _NeedsSave = true;
             return true;
         }
 
         private void ShowStatus(string time) =>
-            lblAvvio.Text = $"{time} - {_state.Today} ({_state.Yesterday}) {_state.Total}";
+            lblAvvio.Text = $"{time} - {_State.Today} ({_State.Yesterday}) {_State.Total}";
 
         private void ResetSession() {
             StopFlash();
             TimerEnd.Stop();
-            _sessionClock.Reset();
-            _breakElapsed = TimeSpan.Zero;
-            _breakClock.Restart();
+            _SessionClock.Reset();
+            _BreakElapsed = TimeSpan.Zero;
+            _BreakClock.Restart();
             TimerStop.Start();
-            lblTimer.Text = SessionDuration.ToString(@"mm\:ss\.f");
-            ShowStatus(_breakElapsed.ToString(@"hh\:mm\:ss"));
+            lblTimer.Text = SESSIONDURATION.ToString(@"mm\:ss\.f");
+            ShowStatus(_BreakElapsed.ToString(@"hh\:mm\:ss"));
         }
 
         private void btnStop_Click(object sender, EventArgs e) {
             AdvanceDate();
             ResetSession();
-            if (_needsSave) {
+            if (_NeedsSave) {
                 Save();
             }
         }
@@ -82,14 +82,14 @@ namespace TimerPomodoro {
         private void btnStart_Click(object sender, EventArgs e) {
             AdvanceDate();
             StopFlash();
-            _sessionStartedAt = DateTime.Now;
-            _sessionClock.Restart();
-            _breakClock.Reset();
+            _SessionStartedAt = DateTime.Now;
+            _SessionClock.Restart();
+            _BreakClock.Reset();
             TimerStop.Stop();
             TimerEnd.Start();
-            lblTimer.Text = SessionDuration.ToString(@"mm\:ss\.f");
-            ShowStatus(_sessionStartedAt.ToString("HH:mm:ss"));
-            if (_needsSave) {
+            lblTimer.Text = SESSIONDURATION.ToString(@"mm\:ss\.f");
+            ShowStatus(_SessionStartedAt.ToString("HH:mm:ss"));
+            if (_NeedsSave) {
                 Save();
             }
         }
@@ -99,40 +99,40 @@ namespace TimerPomodoro {
                 return;
             }
 
-            bool dateChanged = AdvanceDate();
-            TimeSpan remaining = SessionDuration - _sessionClock.Elapsed;
-            if (remaining > TimeSpan.Zero) {
-                lblTimer.Text = remaining.ToString(@"mm\:ss\.f");
-                ShowStatus(_sessionStartedAt.ToString("HH:mm:ss"));
-                if (dateChanged) {
+            bool DateChanged = AdvanceDate();
+            TimeSpan Remaining = SESSIONDURATION - _SessionClock.Elapsed;
+            if (Remaining > TimeSpan.Zero) {
+                lblTimer.Text = Remaining.ToString(@"mm\:ss\.f");
+                ShowStatus(_SessionStartedAt.ToString("HH:mm:ss"));
+                if (DateChanged) {
                     Save();
                 }
                 return;
             }
 
-            _state = _state with { Total = _state.Total + 1, Today = _state.Today + 1 };
-            _needsSave = true;
+            _State = _State with { Total = _State.Total + 1, Today = _State.Today + 1 };
+            _NeedsSave = true;
             ResetSession();
-            Rectangle area = Screen.GetWorkingArea(this);
-            Location = new(area.Left + (area.Width - Width) / 2, area.Top + (area.Height - Height) / 2);
+            Rectangle Area = Screen.GetWorkingArea(this);
+            Location = new(Area.Left + (Area.Width - Width) / 2, Area.Top + (Area.Height - Height) / 2);
             Save();
             BackColor = Color.Yellow;
-            _flashTimer.Start();
+            _FlashTimer.Start();
         }
 
         private void StopFlash() {
-            _flashTimer.Stop();
-            _flashStep = 0;
+            _FlashTimer.Stop();
+            _FlashStep = 0;
             BackColor = SystemColors.Control;
         }
 
         private void FlashTimer_Tick(object sender, EventArgs e) {
-            _flashStep++;
-            if (_flashStep >= 3) {
+            _FlashStep++;
+            if (_FlashStep >= 3) {
                 StopFlash();
                 return;
             }
-            BackColor = _flashStep == 1 ? Color.Blue : Color.Red;
+            BackColor = _FlashStep == 1 ? Color.Blue : Color.Red;
         }
 
         private void lblTimer_MouseMove(object sender, MouseEventArgs e) => MoveWindow();
@@ -207,14 +207,14 @@ namespace TimerPomodoro {
                 return;
             }
 
-            TimeSpan elapsed = _breakClock.Elapsed;
-            _breakClock.Restart();
-            if (elapsed.TotalMilliseconds < TimerStop.Interval * 5) {
-                _breakElapsed += elapsed;
+            TimeSpan Elapsed = _BreakClock.Elapsed;
+            _BreakClock.Restart();
+            if (Elapsed.TotalMilliseconds < TimerStop.Interval * 5) {
+                _BreakElapsed += Elapsed;
             }
-            bool dateChanged = AdvanceDate();
-            ShowStatus(_breakElapsed.ToString(@"hh\:mm\:ss"));
-            if (dateChanged) {
+            bool DateChanged = AdvanceDate();
+            ShowStatus(_BreakElapsed.ToString(@"hh\:mm\:ss"));
+            if (DateChanged) {
                 Save();
             }
         }
@@ -223,19 +223,20 @@ namespace TimerPomodoro {
 
         private bool Save() {
             try {
-                PomodoroStore.Save(_state);
-                _needsSave = false;
+                PomodoroStore.Save(_State);
+                _NeedsSave = false;
                 return true;
             }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) {
-                bool sessionRunning = TimerEnd.Enabled;
-                bool breakRunning = TimerStop.Enabled;
+            catch (Exception Ex) when (Ex is IOException or UnauthorizedAccessException) {
+                bool SessionRunning = TimerEnd.Enabled;
+                bool BreakRunning = TimerStop.Enabled;
                 TimerEnd.Stop();
                 TimerStop.Stop();
-                MessageBox.Show(this, $"Could not save your counters to '{PomodoroStore.FilePath}'.\n\n{exception.Message}",
+                string Error = $"{Ex.GetType().Name} (0x{Ex.HResult:X8}): {Ex.Message}";
+                MessageBox.Show(this, $"Could not save your counters to '{PomodoroStore.FilePath}'.\n\n{Error}",
                     "Timer Pomodoro", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                TimerEnd.Enabled = sessionRunning;
-                TimerStop.Enabled = breakRunning;
+                TimerEnd.Enabled = SessionRunning;
+                TimerStop.Enabled = BreakRunning;
                 return false;
             }
         }

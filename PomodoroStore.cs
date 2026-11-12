@@ -13,17 +13,17 @@ internal sealed record PomodoroState(int Total, int Today, int Yesterday, DateOn
 }
 
 internal static class PomodoroStore {
-    private const string FileName = "TimerPomodoro.txt";
-    private static readonly string DirectoryPath = Path.Combine(
+    private const string FILENAME = "TimerPomodoro.txt";
+    private static readonly string DIRECTORYPATH = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TimerPomodoro");
-    internal static string FilePath => Path.Combine(DirectoryPath, FileName);
+    internal static string FilePath => Path.Combine(DIRECTORYPATH, FILENAME);
 
     internal static (PomodoroState State, bool NeedsSave) Load() {
-        string[] paths = [FilePath, Path.GetFullPath(FileName), Path.Combine(AppContext.BaseDirectory, FileName)];
-        foreach (string path in paths.Distinct(StringComparer.OrdinalIgnoreCase)) {
-            string[] lines;
+        string[] Paths = [FilePath, Path.GetFullPath(FILENAME), Path.Combine(AppContext.BaseDirectory, FILENAME)];
+        foreach (string Path in Paths.Distinct(StringComparer.OrdinalIgnoreCase)) {
+            string[] Lines;
             try {
-                lines = File.ReadAllLines(path);
+                Lines = File.ReadAllLines(Path);
             }
             catch (FileNotFoundException) {
                 continue;
@@ -32,16 +32,16 @@ internal static class PomodoroStore {
                 continue;
             }
 
-            if (lines.Length != 4
-                || !int.TryParse(lines[0], NumberStyles.None, CultureInfo.InvariantCulture, out int total)
-                || !int.TryParse(lines[1], NumberStyles.None, CultureInfo.InvariantCulture, out int today)
-                || !int.TryParse(lines[2], NumberStyles.None, CultureInfo.InvariantCulture, out int yesterday)
-                || (long)today + yesterday > total
-                || !TryReadDate(lines[3], out DateOnly date)) {
-                throw new FormatException($"The saved counters in '{path}' are invalid. The file has not been changed.");
+            if (Lines.Length != 4
+                || !int.TryParse(Lines[0], NumberStyles.None, CultureInfo.InvariantCulture, out int Total)
+                || !int.TryParse(Lines[1], NumberStyles.None, CultureInfo.InvariantCulture, out int Today)
+                || !int.TryParse(Lines[2], NumberStyles.None, CultureInfo.InvariantCulture, out int Yesterday)
+                || (long)Today + Yesterday > Total
+                || !TryReadDate(Lines[3], out DateOnly Date)) {
+                throw new FormatException($"The saved counters in '{Path}' are invalid. The file has not been changed.");
             }
 
-            return (new(total, today, yesterday, date), !StringComparer.OrdinalIgnoreCase.Equals(path, FilePath));
+            return (new(Total, Today, Yesterday, Date), !StringComparer.OrdinalIgnoreCase.Equals(Path, FilePath));
         }
 
         return (new(0, 0, 0, DateOnly.FromDateTime(DateTime.Today)), false);
@@ -52,8 +52,8 @@ internal static class PomodoroStore {
             return true;
         }
 
-        if (DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime legacyDate)) {
-            date = DateOnly.FromDateTime(legacyDate);
+        if (DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.None, out DateTime LegacyDate)) {
+            date = DateOnly.FromDateTime(LegacyDate);
             return true;
         }
 
@@ -61,23 +61,23 @@ internal static class PomodoroStore {
     }
 
     internal static void Save(PomodoroState state) {
-        Directory.CreateDirectory(DirectoryPath);
-        string temporaryPath = $"{FilePath}.{Guid.NewGuid():N}.tmp";
-        using (FileStream stream = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
-            using StreamWriter writer = new(stream, new UTF8Encoding(false), leaveOpen: true);
-            writer.WriteLine(state.Total.ToString(CultureInfo.InvariantCulture));
-            writer.WriteLine(state.Today.ToString(CultureInfo.InvariantCulture));
-            writer.WriteLine(state.Yesterday.ToString(CultureInfo.InvariantCulture));
-            writer.WriteLine(state.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-            writer.Flush();
-            stream.Flush(true);
+        Directory.CreateDirectory(DIRECTORYPATH);
+        string TemporaryPath = $"{FilePath}.{Guid.NewGuid():N}.tmp";
+        using (FileStream Stream = new(TemporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+            using StreamWriter Writer = new(Stream, new UTF8Encoding(false), leaveOpen: true);
+            Writer.WriteLine(state.Total.ToString(CultureInfo.InvariantCulture));
+            Writer.WriteLine(state.Today.ToString(CultureInfo.InvariantCulture));
+            Writer.WriteLine(state.Yesterday.ToString(CultureInfo.InvariantCulture));
+            Writer.WriteLine(state.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+            Writer.Flush();
+            Stream.Flush(true);
         }
 
         if (File.Exists(FilePath)) {
-            File.Replace(temporaryPath, FilePath, null);
+            File.Replace(TemporaryPath, FilePath, null);
         }
         else {
-            File.Move(temporaryPath, FilePath);
+            File.Move(TemporaryPath, FilePath);
         }
     }
 }
